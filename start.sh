@@ -57,24 +57,34 @@ trap cleanup SIGINT SIGTERM
 
 # ========== 后端启动 ==========
 start_backend() {
+    # 加载 .env 文件中的环境变量
+    if [ -f "$BACK_DIR/.env" ]; then
+        set -a
+        source "$BACK_DIR/.env"
+        set +a
+    fi
+
+    # 读取后端端口配置
+    BACKEND_PORT=${LOF_BACKEND_PORT:-8000}
+
     # 先清理占用端口的老进程
-    kill_port 8000 "后端"
+    kill_port $BACKEND_PORT "后端"
 
     log_info "启动后端服务..."
 
     cd "$BACK_DIR"
 
     # 检查虚拟环境
-    if [ ! -d "venv" ]; then
+    if [ ! -d ".venv" ]; then
         log_error "后端虚拟环境不存在，请先创建：cd back && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
         exit 1
     fi
 
     # 激活虚拟环境并启动
     source venv/bin/activate
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+    uvicorn app.main:app --reload --host 0.0.0.0 --port $BACKEND_PORT &
     BACK_PID=$!
-    log_info "后端服务已启动 (PID: $BACK_PID, http://localhost:8000)"
+    log_info "后端服务已启动 (PID: $BACK_PID, http://localhost:$BACKEND_PORT)"
 }
 
 # ========== 前端启动 ==========

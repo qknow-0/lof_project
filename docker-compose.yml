@@ -1,0 +1,13 @@
+services:
+  lof-backend:
+    build: ./back
+    container_name: lof-backend
+    ports:
+      - "${LOF_BACKEND_PORT:-8000}:8000"
+    environment:
+      - TZ=Asia/Shanghai
+      - LOF_ALERT_CRON_HOURS=${LOF_ALERT_CRON_HOURS:-11,14}
+      - LOF_ALERT_CRON_DAYS=${LOF_ALERT_CRON_DAYS:-mon-fri}
+      - LOF_ALERT_MAX_COUNT=${LOF_ALERT_MAX_COUNT:-5}
+      - LOF_ALERT_API_BASE_URL=${LOF_ALERT_API_BASE_URL:-}
+    restart: unless-stopped

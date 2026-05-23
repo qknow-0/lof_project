@@ -1,16 +1,16 @@
-# macOS
-.DS_Store
-
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
+.venv/
 venv/
 .env
-
-# IDE
-.idea/
+.git/
+.gitignore
 .claude/
+.DS_Store
+*.md
+node_modules/
+front/
+docs/
 
 back/.venv
-back/.env
