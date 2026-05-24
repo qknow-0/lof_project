@@ -26,14 +26,12 @@ show_help() {
     echo "  clean    停止容器并删除镜像"
 }
 
-
 echo "=== 拉取最新代码 ==="
 if [[ -n $(git status --porcelain) ]]; then
     echo "警告: 本地有未提交的更改，跳过 git pull"
 else
     git pull
 fi
-
 
 case "${1:-}" in
     up)
