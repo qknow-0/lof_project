@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.config import settings
 from app.routers.lof import router as lof_router
@@ -13,7 +13,7 @@ from app.services.alerter import run_alert_cycle
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
+scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 cron_expr = f"0 {settings.cron_hours} * * {settings.cron_days}"
 
 
