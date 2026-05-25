@@ -26,17 +26,16 @@ show_help() {
     echo "  clean    停止容器并删除镜像"
 }
 
-echo "=== 拉取最新代码 ==="
-if [[ -n $(git status --porcelain) ]]; then
-    echo "警告: 本地有未提交的更改，跳过 git pull"
-else
-    git pull
-fi
-
 case "${1:-}" in
     up)
-        log_info "构建并启动服务..."
         cd "$PROJECT_ROOT"
+        if [[ -n $(git status --porcelain) ]]; then
+            log_warn "本地有未提交的更改，跳过 git pull"
+        else
+            log_info "拉取最新代码..."
+            git pull
+        fi
+        log_info "构建并启动服务..."
         docker compose up -d --build
         log_info "服务已启动"
         docker compose ps
@@ -48,8 +47,14 @@ case "${1:-}" in
         log_info "服务已停止"
         ;;
     restart)
-        log_info "重启服务..."
         cd "$PROJECT_ROOT"
+        if [[ -n $(git status --porcelain) ]]; then
+            log_warn "本地有未提交的更改，跳过 git pull"
+        else
+            log_info "拉取最新代码..."
+            git pull
+        fi
+        log_info "重启服务..."
         docker compose down
         docker compose up -d --build
         log_info "服务已重启"
