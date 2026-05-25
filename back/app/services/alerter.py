@@ -127,6 +127,7 @@ def run_alert_cycle() -> None:
         logger.info("告警周期开始...")
         records = fetch_and_filter()
         logger.info("筛选结果：%d 条", len(records))
+        logger.info("records: %s", records)
         push_to_notify(records)
     except Exception:
         logger.exception("告警周期异常")
