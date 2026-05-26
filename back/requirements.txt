@@ -2,5 +2,5 @@ fastapi
 uvicorn
 akshare
 pandas
-apscheduler
+requests
 python-dotenv
