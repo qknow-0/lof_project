@@ -1,7 +1,6 @@
 """FastAPI 应用入口：创建 app、配置中间件、挂载路由、启动定时告警"""
 import logging
 import threading
-import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -42,10 +41,15 @@ def _alert_loop():
     tz = ZoneInfo("Asia/Shanghai")
     hours, days = _parse_cron_config()
     last_fire_date = None
+    tick = 0
 
     while not _stop_event.is_set():
         now = datetime.now(tz)
         today_key = now.strftime("%Y-%m-%d")
+        tick += 1
+        if tick % 120 == 1:
+            logger.info("alert-loop heartbeat #%d, current=%s, hours=%s, days=%s",
+                        tick, now.strftime("%Y-%m-%d %H:%M:%S"), hours, days)
 
         if (
             now.hour in hours
