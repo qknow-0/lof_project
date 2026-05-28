@@ -1,6 +1,7 @@
 """FastAPI 应用入口：创建 app、配置中间件、挂载路由、启动定时告警"""
 import logging
 import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -66,7 +67,11 @@ def _alert_loop():
                 except Exception:
                     logger.exception("告警周期异常")
 
-        _stop_event.wait(timeout=30)
+        # time.sleep 替代 _stop_event.wait(timeout) — 后者在 Docker 中唤醒间隔不稳定
+        for _ in range(30):
+            if _stop_event.is_set():
+                return
+            time.sleep(1)
 
 
 _stop_event = threading.Event()
