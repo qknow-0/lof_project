@@ -1,9 +1,11 @@
 """FastAPI 应用入口：创建 app、配置中间件、挂载路由、启动定时告警"""
+import json
 import logging
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
@@ -18,56 +20,73 @@ logger = logging.getLogger(__name__)
 
 cron_expr = f"0 {settings.cron_hours} * * {settings.cron_days}"
 
+_ALERT_STATE_FILE = Path(__file__).parent / ".alert_state.json"
+
 
 def _parse_cron_config():
     """解析 cron_hours 和 cron_days 为可快速检查的集合"""
     hours = {int(h) for h in settings.cron_hours.split(",")}
-    # mon-fri -> 0-4 (Monday=0)
     day_map = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
     days = set()
     for part in settings.cron_days.split(","):
         part = part.strip()
         if "-" in part:
             start, end = part.split("-")
-            start_idx = day_map[start]
-            end_idx = day_map[end]
-            days.update(range(start_idx, end_idx + 1))
+            days.update(range(day_map[start], day_map[end] + 1))
         else:
             days.add(day_map[part])
     return hours, days
 
 
+def _load_fired_slots() -> set[str]:
+    """加载已触发的时段集合，格式 {"2026-05-29-11", "2026-05-29-14"}"""
+    try:
+        if _ALERT_STATE_FILE.exists():
+            data = json.loads(_ALERT_STATE_FILE.read_text())
+            return set(data)
+    except Exception:
+        logger.warning("读取 .alert_state.json 失败，重置")
+    return set()
+
+
+def _save_fired_slots(slots: set[str]) -> None:
+    """持久化已触发时段，只保留最近 30 天"""
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    slots = {s for s in slots if s[:10] >= cutoff}
+    _ALERT_STATE_FILE.write_text(json.dumps(sorted(slots), ensure_ascii=False))
+
+
 def _alert_loop():
-    """后台线程：每 30 秒检查一次当前时间，匹配 cron 配置时触发告警"""
+    """后台线程：每 30 秒检查一次，当前时间 >= 目标时段时触发告警"""
     tz = ZoneInfo("Asia/Shanghai")
     hours, days = _parse_cron_config()
-    last_fire_date = None
+    fired_slots = _load_fired_slots()
     tick = 0
 
     while not _stop_event.is_set():
         now = datetime.now(tz)
-        today_key = now.strftime("%Y-%m-%d")
+        today = now.strftime("%Y-%m-%d")
         tick += 1
         if tick % 120 == 1:
-            logger.info("alert-loop heartbeat #%d, current=%s, hours=%s, days=%s",
-                        tick, now.strftime("%Y-%m-%d %H:%M:%S"), hours, days)
+            logger.info("alert-loop heartbeat #%d, current=%s, hours=%s, days=%s, fired=%d",
+                        tick, now.strftime("%Y-%m-%d %H:%M:%S"), hours, days, len(fired_slots))
 
-        if (
-            now.hour in hours
-            and now.minute == 0
-            and now.weekday() in days
-            and last_fire_date != today_key + str(now.hour)
-        ):
-            # 在目标小时的 0-30 秒内触发，记录防重复
-            if now.second < 30:
-                last_fire_date = today_key + str(now.hour)
-                logger.info("定时告警触发: %s", now.strftime("%Y-%m-%d %H:%M:%S"))
-                try:
-                    run_alert_cycle()
-                except Exception:
-                    logger.exception("告警周期异常")
+        if now.weekday() in days:
+            for h in hours:
+                slot = f"{today}-{h}"
+                if slot in fired_slots:
+                    continue
+                # 当前时间 >= 该时段的起始时间（hh:00:00）
+                slot_start = datetime(now.year, now.month, now.day, h, 0, 0, tzinfo=tz)
+                if now >= slot_start:
+                    fired_slots.add(slot)
+                    logger.info("定时告警触发: slot=%s, now=%s", slot, now.strftime("%Y-%m-%d %H:%M:%S"))
+                    try:
+                        run_alert_cycle()
+                    except Exception:
+                        logger.exception("告警周期异常")
+                    _save_fired_slots(fired_slots)
 
-        # time.sleep 替代 _stop_event.wait(timeout) — 后者在 Docker 中唤醒间隔不稳定
         for _ in range(30):
             if _stop_event.is_set():
                 return
