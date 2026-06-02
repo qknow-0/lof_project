@@ -24,8 +24,16 @@ _ALERT_STATE_FILE = Path(__file__).parent / ".alert_state.json"
 
 
 def _parse_cron_config():
-    """解析 cron_hours 和 cron_days 为可快速检查的集合"""
-    hours = {int(h) for h in settings.cron_hours.split(",")}
+    """解析 cron_hours 和 cron_days 为可快速检查的集合。
+    cron_hours 支持 HH 或 HH:MM 格式，例如 '11,14' 或 '14,14:30'"""
+    hours_minutes = set()
+    for part in settings.cron_hours.split(","):
+        part = part.strip()
+        if ":" in part:
+            h, m = part.split(":")
+            hours_minutes.add((int(h), int(m)))
+        else:
+            hours_minutes.add((int(part), 0))
     day_map = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
     days = set()
     for part in settings.cron_days.split(","):
@@ -35,11 +43,11 @@ def _parse_cron_config():
             days.update(range(day_map[start], day_map[end] + 1))
         else:
             days.add(day_map[part])
-    return hours, days
+    return hours_minutes, days
 
 
 def _load_fired_slots() -> set[str]:
-    """加载已触发的时段集合，格式 {"2026-05-29-11", "2026-05-29-14"}"""
+    """加载已触发的时段集合，格式 {"2026-05-29-11", "2026-05-29-14", "2026-05-29-14:30"}"""
     try:
         if _ALERT_STATE_FILE.exists():
             data = json.loads(_ALERT_STATE_FILE.read_text())
@@ -59,7 +67,7 @@ def _save_fired_slots(slots: set[str]) -> None:
 def _alert_loop():
     """后台线程：每 30 秒检查一次，当前时间 >= 目标时段时触发告警"""
     tz = ZoneInfo("Asia/Shanghai")
-    hours, days = _parse_cron_config()
+    hours_minutes, days = _parse_cron_config()
     fired_slots = _load_fired_slots()
     tick = 0
 
@@ -68,16 +76,16 @@ def _alert_loop():
         today = now.strftime("%Y-%m-%d")
         tick += 1
         if tick % 120 == 1:
-            logger.info("alert-loop heartbeat #%d, current=%s, hours=%s, days=%s, fired=%d",
-                        tick, now.strftime("%Y-%m-%d %H:%M:%S"), hours, days, len(fired_slots))
+            logger.info("alert-loop heartbeat #%d, current=%s, hours_minutes=%s, days=%s, fired=%d",
+                        tick, now.strftime("%Y-%m-%d %H:%M:%S"), hours_minutes, days, len(fired_slots))
 
         if now.weekday() in days:
-            for h in hours:
-                slot = f"{today}-{h}"
+            for h, m in hours_minutes:
+                slot = f"{today}-{h}" if m == 0 else f"{today}-{h}:{m:02d}"
                 if slot in fired_slots:
                     continue
-                # 当前时间 >= 该时段的起始时间（hh:00:00）
-                slot_start = datetime(now.year, now.month, now.day, h, 0, 0, tzinfo=tz)
+                # 当前时间 >= 该时段的起始时间
+                slot_start = datetime(now.year, now.month, now.day, h, m, 0, tzinfo=tz)
                 if now >= slot_start:
                     fired_slots.add(slot)
                     logger.info("定时告警触发: slot=%s, now=%s", slot, now.strftime("%Y-%m-%d %H:%M:%S"))

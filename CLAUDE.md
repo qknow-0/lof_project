@@ -121,7 +121,7 @@ docker compose down
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `LOF_BACKEND_PORT` | 8000 | 宿主机映射端口 |
-| `LOF_ALERT_CRON_HOURS` | 11,14 | 告警触发小时（交易日） |
+| `LOF_ALERT_CRON_HOURS` | 14,14:30 | 告警触发时间，支持 HH 或 HH:MM（交易日） |
 | `LOF_ALERT_CRON_DAYS` | mon-fri | 告警触发星期 |
 | `LOF_ALERT_MAX_COUNT` | 5 | 每次推送最大基金数 |
 | `LOF_ALERT_API_BASE_URL` | （空） | 通知服务地址，为空则跳过推送 |
