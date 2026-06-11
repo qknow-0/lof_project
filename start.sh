@@ -76,12 +76,12 @@ start_backend() {
 
     # 检查虚拟环境
     if [ ! -d ".venv" ]; then
-        log_error "后端虚拟环境不存在，请先创建：cd back && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+        log_error "后端虚拟环境不存在，请先创建：cd back && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
         exit 1
     fi
 
     # 激活虚拟环境并启动
-    source venv/bin/activate
+    source .venv/bin/activate
     uvicorn app.main:app --reload --host 0.0.0.0 --port $BACKEND_PORT &
     BACK_PID=$!
     log_info "后端服务已启动 (PID: $BACK_PID, http://localhost:$BACKEND_PORT)"
